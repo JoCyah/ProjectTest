@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Deploy single DynamoDb table with Local Secondary Index and Lambda functions
+  for personal library manager.
+Parameters:
+  POCNameParameter:
+    Type: String
+    Default: Your Name
+  EnvironmentParameter:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - test
+    - prod
+  TableNameParameter:
+    Type: String
+    Default: EchoMessages
+Resources:
+  MessageTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Ref: TableNameParameter
+      AttributeDefinitions:
+      - AttributeName: IpAddress
+        AttributeType: S
+      - AttributeName: Date
+        AttributeType: S
+      - AttributeName: Message
+        AttributeType: S
+      KeySchema:
+      - AttributeName: IpAddress
+        KeyType: HASH
+      - AttributeName: Date
+        KeyType: RANGE
+      GlobalSecondaryIndexes:
+      - IndexName:
+          Fn::Join:
+          - '-'
+          - - GlobalIndex
+            - Ref: TableNameParameter
+            - ByDate
+        KeySchema:
+        - AttributeName: Date
+          KeyType: HASH
+        - AttributeName: IpAddress
+          KeyType: RANGE
+        Projection:
+          NonKeyAttributes:
+          - Message
+          ProjectionType: INCLUDE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+      LocalSecondaryIndexes:
+      - IndexName:
+          Fn::Join:
+          - '-'
+          - - LocalIndex
+            - Ref: TableNameParameter
+            - One
+        KeySchema:
+        - AttributeName: IpAddress
+          KeyType: HASH
+        - AttributeName: Message
+          KeyType: RANGE
+        Projection:
+          NonKeyAttributes:
+          - Date
+          ProjectionType: INCLUDE
+      - IndexName:
+          Fn::Join:
+          - '-'
+          - - LocalIndex
+            - Ref: TableNameParameter
+            - Two
+        KeySchema:
+        - AttributeName: IpAddress
+          KeyType: HASH
+        - AttributeName: Date
+          KeyType: RANGE
+        Projection:
+          NonKeyAttributes:
+          - Message
+          ProjectionType: INCLUDE
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: EnvironmentParameter
+  BooksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Books
+      AttributeDefinitions:
+      - AttributeName: book_id
+        AttributeType: S
+      KeySchema:
+      - AttributeName: book_id
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+  AddBookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: add_book.lambda_handler
+      Runtime: python3.12
+      CodeUri: AddBookFunction
+      MemorySize: 128
+      Timeout: 10
+      Policies:
+      - AmazonDynamoDBFullAccess
+      - AWSLambdaExecute
+      Environment:
+        Variables:
+          BOOKS_TABLE:
+            Ref: BooksTable
+    Metadata:
+      SamResourceId: AddBookFunction
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: LibraryAPI
+      StageName:
+        Ref: EnvironmentParameter
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          title: LibraryAPI
+          version: '1.0'
+        paths:
+          /books:
+            post:
+              x-amazon-apigateway-integration:
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddBookFunction.Arn}/invocations
+                httpMethod: POST
+                type: aws_proxy
+Outputs:
+  MessageTableName:
+    Description: DynamoDb table name
+    Value:
+      Ref: MessageTable
+    Export:
+      Name:
+        Fn::Join:
+        - '-'
+        - - Ref: AWS::StackName
+          - TableName
+  MessageTableArn:
+    Description: DynamoDb table ARN
+    Value:
+      Fn::GetAtt:
+      - MessageTable
+      - Arn
+    Export:
+      Name:
+        Fn::Join:
+        - '-'
+        - - Ref: AWS::StackName
+          - Ref: TableNameParameter
+          - ARN
+  BooksTableName:
+    Description: DynamoDb Books table name
+    Value:
+      Ref: BooksTable
+  BooksTableArn:
+    Description: DynamoDb Books table ARN
+    Value:
+      Fn::GetAtt:
+      - BooksTable
+      - Arn
+  ApiGatewayInvokeURL:
+    Description: URL for API Gateway
+    Value:
+      Fn::Sub: https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentParameter}/books
