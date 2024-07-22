@@ -7,6 +7,6 @@ architecture = "x86_64"
 handler = "add_book.lambda_handler"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["AddBookFunction"]
+functions = ["AddBookFunction", "GetBookFunction", "ListBooksFunction"]
 
 [layer_build_definitions]

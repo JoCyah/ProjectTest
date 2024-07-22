@@ -111,7 +111,39 @@ Resources:
         Variables:
           BOOKS_TABLE: !Ref BooksTable
 
-  # API Gateway to expose the Lambda function as REST API endpoint
+  # Lambda Function to get a book
+  GetBookFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: 'get_book.lambda_handler'
+      Runtime: 'python3.12'
+      CodeUri: './src'
+      MemorySize: 128
+      Timeout: 10
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaExecute
+      Environment:
+        Variables:
+          BOOKS_TABLE: !Ref BooksTable
+
+  # Lambda Function to list all books
+  ListBooksFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: 'list_books.lambda_handler'
+      Runtime: 'python3.12'
+      CodeUri: './src'
+      MemorySize: 128
+      Timeout: 10
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AWSLambdaExecute
+      Environment:
+        Variables:
+          BOOKS_TABLE: !Ref BooksTable
+
+  # API Gateway to expose the Lambda functions as REST API endpoints
   ApiGateway:
     Type: 'AWS::Serverless::Api'
     Properties:
@@ -129,6 +161,19 @@ Resources:
                 uri:
                   Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddBookFunction.Arn}/invocations'
                 httpMethod: 'POST'
+                type: 'aws_proxy'
+            get:
+              x-amazon-apigateway-integration:
+                uri:
+                  Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListBooksFunction.Arn}/invocations'
+                httpMethod: 'GET'
+                type: 'aws_proxy'
+          /books/{book_id}:
+            get:
+              x-amazon-apigateway-integration:
+                uri:
+                  Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetBookFunction.Arn}/invocations'
+                httpMethod: 'GET'
                 type: 'aws_proxy'
 
 Outputs:
