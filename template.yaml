@@ -107,6 +107,7 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AWSLambdaExecute
+        - AmazonAPIGatewayPushToCloudWatchLogs
       Environment:
         Variables:
           BOOKS_TABLE: !Ref BooksTable
@@ -123,6 +124,7 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AWSLambdaExecute
+        - AmazonAPIGatewayPushToCloudWatchLogs
       Environment:
         Variables:
           BOOKS_TABLE: !Ref BooksTable
@@ -139,9 +141,11 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AWSLambdaExecute
+        - AmazonAPIGatewayPushToCloudWatchLogs
       Environment:
         Variables:
           BOOKS_TABLE: !Ref BooksTable
+
 
   # API Gateway to expose the Lambda functions as REST API endpoints
   ApiGateway:
@@ -162,12 +166,18 @@ Resources:
                   Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AddBookFunction.Arn}/invocations'
                 httpMethod: 'POST'
                 type: 'aws_proxy'
-            get:
-              x-amazon-apigateway-integration:
-                uri:
-                  Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListBooksFunction.Arn}/invocations'
-                httpMethod: 'GET'
-                type: 'aws_proxy'
+              responses:
+                default:
+                  description: "Default response for POST /books"
+          get:
+            x-amazon-apigateway-integration:
+              uri:
+                Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListBooksFunction.Arn}/invocations'
+              httpMethod: 'GET'
+              type: 'aws_proxy'
+            responses:
+              default:
+                description: "Default response for GET /books"
           /books/{book_id}:
             get:
               x-amazon-apigateway-integration:
@@ -175,6 +185,9 @@ Resources:
                   Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetBookFunction.Arn}/invocations'
                 httpMethod: 'GET'
                 type: 'aws_proxy'
+              responses:
+                default:
+                  description: "Default response for GET /books/{book_id}"
 
 Outputs:
   MessageTableName:

@@ -28,6 +28,9 @@ def lambda_handler(event, context):
         # Scan the DynamoDB table to retrieve all books
         response = table.scan()
         items = response.get('Items', [])
+        
+        # Log the response from DynamoDB scan
+        logger.info(f"DynamoDB scan response: {json.dumps(response)}")
 
         # Extract relevant details (book_id, title, author) for each book
         book_summaries = [
@@ -39,9 +42,15 @@ def lambda_handler(event, context):
             for item in items
         ]
 
+        # Log the book summaries
+        logger.info(f"Book summaries: {json.dumps(book_summaries)}")
+
         # Return the book summaries in the response
         return {
             'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps(book_summaries)
         }
 
@@ -49,5 +58,8 @@ def lambda_handler(event, context):
         logger.error(f"Error processing event: {e}")
         return {
             'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
             'body': json.dumps(f"Internal server error: {str(e)}")
         }
